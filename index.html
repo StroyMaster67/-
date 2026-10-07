@@ -91,9 +91,13 @@ header{background:none;backdrop-filter:none;border:0;padding:8px 8px 0}
 <body>
 <header><div class="bar"><a class="logo" href="#/"><i>🏗️</i>СтройМастер</a><nav id="nav"></nav></div></header>
 <main id="app"></main>
-<footer class="mut small"><div class="fcols"><div><b>СтройМастер</b><br>Строительство, ремонт и проектирование</div><div><b>Разделы</b><br><a href="#/catalog">Услуги</a> · <a href="#/projects">Проекты</a></div><div><b>Контакты</b><br>+7 900 000-00-00<br>info@stroy.ru<br>Пн–Вс 9:00–20:00</div></div>СтройМастер: учебный прототип сайта строительной компании. Данные хранятся в браузере.</footer>
+<footer class="mut small"><div class="fcols"><div><b>СтройМастер</b><br>Строительство, ремонт и проектирование</div><div><b>Разделы</b><br><a href="#/catalog">Услуги</a> · <a href="#/projects">Проекты</a></div><div><b>Контакты</b><br>+7 900 000-00-00<br>info@stroy.ru<br>Пн–Вс 9:00–20:00</div></div>СтройМастер: учебный прототип сайта строительной компании. Данные сохраняются в облачной базе данных.</footer>
 <div id="t"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+const SUPABASE_URL="https://vrfzakvtbldmijlgqpas.supabase.co";
+const SUPABASE_KEY="sb_publishable_sbHNISSA1Rh3hf4if_Wc6Q_pRop1m7J";
+const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const $=s=>document.querySelector(s),K='stroy_db2',TYPES=['Строительство','Ремонт','Отделка','Проектирование'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const TC={'Строительство':'#2540ff','Ремонт':'#ff7a1a','Отделка':'#00a88f','Проектирование':'#8b3dff'},TI={'Строительство':'🏗️','Ремонт':'🛠️','Отделка':'🎨','Проектирование':'📐'},tc=t=>TC[t]||'#2540ff',tag=t=>`<span class="tag" style="--c:${tc(t)}">${esc(t)}</span>`;
@@ -101,9 +105,11 @@ const SC=['','','https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?au
 SCT={'Строительство':0,'Ремонт':2,'Отделка':3,'Проектирование':5},ph=o=>{const c=tc(o.type),e=TI[o.type]||'🏗️';return 'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c}"/><stop offset="1" stop-color="#0f1535"/></linearGradient></defs><rect width="800" height="500" fill="url(#g)"/><text x="400" y="300" font-size="170" text-anchor="middle">${e}</text></svg>`)},pic=o=>o.img||ph(o);
 const rub=n=>(+n).toLocaleString('ru-RU')+' ₽',today=()=>new Date().toISOString().slice(0,10),nid=a=>Math.max(0,...a.map(x=>x.id))+1;
 let db,tab='services',ed=null;
-const view=h=>{$('#app').innerHTML=h},me=()=>db.users.find(u=>u.id==db.me),svc=id=>db.services.find(s=>s.id==id);
+const view=h=>{$('#app').innerHTML=h},me=()=>db?.users?.find(u=>u.id==db.me),svc=id=>db?.services?.find(s=>s.id==id);
 const cat=id=>(db.cats.find(c=>c.id==id)||{}).name||'',uname=id=>(db.users.find(u=>u.id==id)||{}).name||'Аноним';
-const isFav=id=>db.favs.some(f=>f.uid==db.me&&f.sid==id),save=()=>{try{localStorage.setItem(K,JSON.stringify(db))}catch(e){}};
+const isFav=id=>db.favs.some(f=>String(f.uid)==String(db.me)&&String(f.sid)==String(id));
+const save=()=>{};
+const syncUser=async()=>{const {data:{user}}=await supabaseClient.auth.getUser();db.me=user?.id||null;if(user){let {data:p}=await supabaseClient.from('profiles').select('id,name,role').eq('id',user.id).maybeSingle();db.users=[{id:user.id,name:p?.name||user.user_metadata?.name||'Пользователь',email:user.email||'',role:p?.role||'user'}];}else db.users=[];};
 const go=h=>location.hash==h?route():(location.hash=h);
 function toast(m){const t=$('#t');t.textContent=m;t.className='on';clearTimeout(toast.i);toast.i=setTimeout(()=>t.className='',2600)}
 const need=()=>{toast('Войдите или зарегистрируйтесь');go('#/login')};
@@ -149,27 +155,25 @@ function service(id){const s=svc(id);if(!s)return go('#/catalog');
 const rv=db.reviews.filter(r=>r.sid==s.id),avg=rv.length?(rv.reduce((a,r)=>a+r.rate,0)/rv.length).toFixed(1):'—';
 view(`<p><a href="#/catalog">← К каталогу</a></p><div class="card" style="--c:${tc(s.type)}"><img class="banner" src="${pic(s,s.id<7?s.id-1:undefined)}" alt="${esc(s.title)}"><div class="row small mut">${tag(s.type)}<span>${esc(cat(s.cat))}</span></div><h1>${esc(s.title)}</h1><p>${esc(s.descr)}</p><div class="facts"><div><small>Цена</small><b>от ${rub(s.price)}/${esc(s.u)}</b></div><div><small>Сроки</small><b>от ${s.days} дн.</b></div><div><small>Рейтинг</small><b>★ ${avg} (${rv.length})</b></div></div><div class="row"><button onclick="reqForm(${s.id})">Оставить заявку</button><button class="ghost" onclick="fav(${s.id})">${isFav(s.id)?'♥ В избранном':'♡ В избранное'}</button></div><div id="rf"></div></div><div class="card calc" style="--c:${tc(s.type)}"><h3>Калькулятор стоимости</h3><label>Площадь, ${esc(s.u)}<input type="number" min="1" value="100" oninput="calc(this.value,${s.price},${s.days})"></label><p id="cv" class="mut">Ориентировочно: <b>${rub(100*s.price)}</b> · срок около <b>${s.days} дн.</b></p><p class="small mut">Точную смету составим после замера.</p></div><h2>Отзывы</h2>${rv.map(r=>`<div class="card"><b>${esc(uname(r.uid))}</b> ${'★'.repeat(r.rate)}<p>${esc(r.text)}</p><span class="mut small">${r.date}</span></div>`).join('')||'<p class="mut">Пока нет отзывов.</p>'}${revForm(s.id)}<h2>Похожие услуги</h2><div class="grid">${db.services.filter(x=>x.id!=s.id&&(x.type==s.type||x.cat==s.cat)).slice(0,3).map(card).join('')}</div>`)}
 function reqForm(id){if(!db.me)return need();$('#rf').innerHTML=`<form class="stack" onsubmit="event.preventDefault();addReq(this,${id})"><h3>Заявка</h3><select name="kind"><option>Консультация</option><option>Расчёт стоимости</option></select><input name="phone" type="tel" required placeholder="Телефон"><textarea name="comment" placeholder="Площадь, адрес, пожелания"></textarea><button>Отправить заявку</button></form>`}
-function addReq(f,sid){db.reqs.push({id:nid(db.reqs),uid:db.me,sid,kind:f.kind.value,phone:f.phone.value,comment:f.comment.value,status:'Новая',date:today()});save();toast('Заявка отправлена. Статус виден в личном кабинете.');$('#rf').innerHTML=''}
-function addRev(f,sid){db.reviews.push({id:nid(db.reviews),uid:db.me,sid,rate:+f.rate.value,text:f.text.value,date:today()});save();toast('Спасибо за отзыв!');route(1)}
-function fav(id){if(!db.me)return need();const i=db.favs.findIndex(f=>f.uid==db.me&&f.sid==id);i<0?db.favs.push({uid:db.me,sid:id}):db.favs.splice(i,1);save();location.hash.startsWith('#/catalog')?fl():route(1)}
+async function addReq(f,sid){const {error}=await supabaseClient.from('requests').insert({user_id:db.me,service_id:sid,phone:f.phone.value,kind:f.kind.value,comment:f.comment.value});if(error)return toast('Не удалось отправить заявку: '+error.message);await loadRemote();toast('Заявка отправлена. Статус виден в личном кабинете.');$('#rf').innerHTML=''}
+async function addRev(f,sid){const {error}=await supabaseClient.from('reviews').insert({user_id:db.me,service_id:sid,rate:+f.rate.value,text:f.text.value});if(error)return toast('Не удалось отправить отзыв: '+error.message);await loadRemote();toast('Спасибо за отзыв!');route(1)}
+async function fav(id){if(!db.me)return need();const i=db.favs.findIndex(f=>String(f.uid)==String(db.me)&&String(f.sid)==String(id));let error;if(i<0){({error}=await supabaseClient.from('favorites').insert({user_id:db.me,service_id:id}));}else{({error}=await supabaseClient.from('favorites').delete().eq('user_id',db.me).eq('service_id',id));}if(error)return toast('Не удалось изменить избранное: '+error.message);await loadRemote();location.hash.startsWith('#/catalog')?fl():route(1)}
 function projects(_,qs){const t=new URLSearchParams(qs||'').get('t')||'';view(`<h1>Наши проекты</h1><div class="chips2"><a href="#/projects" class="${t?'':'on'}">Все</a>${TYPES.map(x=>`<a href="#/projects?t=${encodeURIComponent(x)}" class="${x==t?'on':''}">${x}</a>`).join('')}</div><div class="grid">${db.projects.filter(p=>!t||p.type==t).map(pcard).join('')||'<p class="mut">Нет проектов.</p>'}</div>`)}
 function cabinet(){const u=me();if(!u)return go('#/login');
 const rq=db.reqs.filter(r=>r.uid==u.id).reverse(),rv=db.reviews.filter(r=>r.uid==u.id),fv=db.favs.filter(f=>f.uid==u.id).map(f=>svc(f.sid)).filter(Boolean);
 view(`<h1>Личный кабинет</h1><p class="mut">${esc(u.name)}, ${esc(u.email)}</p><h2>Мои заявки</h2>${tbl(['Дата','Услуга','Тип','Статус'],rq.map(r=>[r.date,(svc(r.sid)||{}).title,r.kind,r.status]))}<h2>Мои отзывы</h2>${rv.map(r=>`<div class="card"><b>${esc((svc(r.sid)||{}).title)}</b> ${'★'.repeat(r.rate)}<p>${esc(r.text)}</p></div>`).join('')||'<p class="mut">Вы ещё не оставляли отзывов.</p>'}<h2>Избранное</h2><div class="grid">${fv.map(card).join('')||'<p class="mut">В избранном пока пусто.</p>'}</div>`)}
 const authForm=reg=>view(`<form class="card stack narrow" onsubmit="event.preventDefault();${reg?'doReg':'doLogin'}(this)"><h1>${reg?'Регистрация':'Вход'}</h1>${reg?'<input name="nm" required placeholder="Имя">':''}<input name="email" type="email" required placeholder="Email"><input name="pass" type="password" required placeholder="Пароль${reg?' (от 6 символов)':''}"><button>${reg?'Зарегистрироваться':'Войти'}</button>${reg?'<a href="#/login">Уже есть аккаунт? Войти</a>':'<a href="#/register">Нет аккаунта? Зарегистрироваться</a><p class="mut small">Демо: admin@stroy.ru / admin123 или ivan@mail.ru / 123456</p>'}</form>`);
 const login=()=>authForm(0),register=()=>authForm(1);
-function doLogin(f){const u=db.users.find(x=>x.email==f.email.value.trim().toLowerCase()&&x.pass==f.pass.value);if(!u)return toast('Неверный email или пароль');db.me=u.id;save();go(u.role=='admin'?'#/admin':'#/cabinet')}
-function doReg(f){const e=f.email.value.trim().toLowerCase();if(db.users.some(x=>x.email==e))return toast('Этот email уже зарегистрирован');if(f.pass.value.length<6)return toast('Пароль должен быть от 6 символов');const u={id:nid(db.users),name:f.nm.value.trim(),email:e,pass:f.pass.value,role:'user'};db.users.push(u);db.me=u.id;save();go('#/cabinet')}
-function logout(){db.me=null;save();go('#/')}
+async function doLogin(f){const e=f.email.value.trim().toLowerCase();const {data,error}=await supabaseClient.auth.signInWithPassword({email:e,password:f.pass.value});if(error)return toast('Неверный email или пароль');await syncUser();await loadRemote();go(me()?.role=='admin'?'#/admin':'#/cabinet')}
+async function doReg(f){const e=f.email.value.trim().toLowerCase();if(f.pass.value.length<6)return toast('Пароль должен быть от 6 символов');const {data,error}=await supabaseClient.auth.signUp({email:e,password:f.pass.value,options:{data:{name:f.nm.value.trim()}}});if(error)return toast(error.message);if(data.session){await syncUser();await loadRemote();go('#/cabinet');}else toast('Регистрация создана. Проверьте email для подтверждения аккаунта.')}
+async function logout(){await supabaseClient.auth.signOut();db.me=null;db.users=[];go('#/')}
 const F={services:[['cat','Категория','sel',()=>db.cats.map(c=>[c.id,c.name])],['title','Название'],['price','Цена, ₽','number'],['u','Единица (м², шт.)'],['days','Срок, дней','number'],['type','Тип работ','sel',()=>TYPES.map(t=>[t,t])],['short','Краткое описание'],['descr','Полное описание','area']],
 projects:[['title','Название'],['type','Тип работ','sel',()=>TYPES.map(t=>[t,t])],['descr','Описание','area']]};
 const form=(t,o)=>`<form class="card stack" onsubmit="event.preventDefault();saveF('${t}',this)"><h3>${o.id?'Редактирование':'Добавление'}</h3><input type="hidden" name="rid" value="${o.id||''}">${F[t].map(([k,l,ty,op])=>`<label>${l}${ty=='sel'?`<select name="${k}">${op().map(([v,n])=>`<option value="${esc(v)}"${v==o[k]?' selected':''}>${esc(n)}</option>`).join('')}</select>`:ty=='area'?`<textarea name="${k}">${esc(o[k])}</textarea>`:`<input name="${k}" type="${ty||'text'}" value="${esc(o[k])}" required>`}</label>`).join('')}<label>Фото (до 300 КБ)<input type="file" name="img" accept="image/*"></label><button>Сохранить</button></form>`;
-function saveF(t,f){const E=f.elements,o={};F[t].forEach(([k])=>{const v=E[k].value;o[k]=['cat','price','days'].includes(k)?+v:v});
-const done=img=>{if(img)o.img=img;const a=db[t],i=a.findIndex(x=>x.id==E.rid.value);i>=0?a[i]={...a[i],...o}:a.push({id:nid(a),emoji:'🏗️',hue:Math.floor(Math.random()*360),...o});save();ed=null;toast('Сохранено');admin()};
-const file=E.img&&E.img.files[0];if(!file)return done();if(file.size>3e5)return toast('Фото больше 300 КБ');
-const r=new FileReader();r.onload=()=>done(r.result);r.readAsDataURL(file)}
-function del(t,id){db[t]=db[t].filter(x=>x.id!=id);if(t=='services')['reqs','reviews','favs'].forEach(k=>db[k]=db[k].filter(x=>x.sid!=id));save();ed=null;toast('Удалено');admin()}
-function st(id,v){db.reqs.find(r=>r.id==id).status=v;save();toast('Статус обновлён')}
+async function saveF(t,f){const E=f.elements,o={};F[t].forEach(([k])=>{const v=E[k].value;o[k]=['cat','price','days'].includes(k)?+v:v});
+const file=E.img&&E.img.files[0];const finish=async img=>{if(img)o.image=img;else if(o.img)o.image=o.img;delete o.img;let error;if(t=='services'){const payload={title:o.title,description:o.descr,price:o.price,type:o.type,category_id:o.cat,image:o.image||null};if(E.rid.value)({error}=await supabaseClient.from('services').update(payload).eq('id',+E.rid.value));else({error}=await supabaseClient.from('services').insert(payload));}else{const payload={title:o.title,description:o.descr,type:o.type,image:o.image||null};if(E.rid.value)({error}=await supabaseClient.from('projects').update(payload).eq('id',+E.rid.value));else({error}=await supabaseClient.from('projects').insert(payload));}if(error)return toast('Ошибка сохранения: '+error.message);await loadRemote();ed=null;toast('Сохранено');admin()};if(!file)return finish();if(file.size>3e5)return toast('Фото больше 300 КБ');const r=new FileReader();r.onload=()=>finish(r.result);r.readAsDataURL(file)}
+async function del(t,id){let error;if(t=='services')({error}=await supabaseClient.from('services').delete().eq('id',id));else({error}=await supabaseClient.from('projects').delete().eq('id',id));if(error)return toast('Ошибка удаления: '+error.message);await loadRemote();ed=null;toast('Удалено');admin()}
+async function st(id,v){const {error}=await supabaseClient.from('requests').update({status:v}).eq('id',id).eq('user_id',db.me);if(error)return toast('Ошибка: '+error.message);await loadRemote();toast('Статус обновлён')}
 function edit(t,id){ed={t,o:db[t].find(x=>x.id==id)};admin();$('#app').lastElementChild.scrollIntoView()}
 function setTab(k){tab=k;ed=null;admin()}
 function admin(){const u=me();if(!u||u.role!='admin')return go('#/login');let h;
@@ -177,9 +181,26 @@ if(tab=='reqs')h=tbl(['Дата','Клиент','Услуга','Тип','Ком�
 else h=tbl(['Название','Тип',''],db[tab].map(x=>[x.title,x.type,{h:`<button class="ghost" onclick="edit('${tab}',${x.id})">Изменить</button> <button class="ghost" onclick="del('${tab}',${x.id})">Удалить</button>`}]))+'<br>'+form(tab,ed&&ed.t==tab?ed.o:{});
 view(`<h1>Админ-панель</h1><div class="row">${[['services','Услуги'],['projects','Проекты'],['reqs','Заявки']].map(([k,n])=>`<button class="${tab==k?'':'ghost'}" onclick="setTab('${k}')">${n}</button>`).join('')}</div><br>${h}`)}
 const R={'':home,catalog,service,projects,cabinet,admin,login,register};
-function route(k){const[h,qs]=location.hash.slice(2).split('?'),[p,a]=h.split('/');(R[p]||home)(a,qs);nav();k||scrollTo(0,0)}
-try{db=JSON.parse(localStorage.getItem(K))}catch(e){}
-db=db||seed();addEventListener('hashchange',()=>route());route();
+function route(k){if(!db)return;const[h,qs]=location.hash.slice(2).split('?'),[p,a]=h.split('/');(R[p]||home)(a,qs);nav();k||scrollTo(0,0)}
+async function loadRemote(){
+  const [{data:services,error:sErr},{data:projects,error:pErr},{data:reviews,error:rErr},{data:requests,error:qErr},{data:favorites,error:fErr},{data:profiles,error:uErr}]=await Promise.all([
+    supabaseClient.from('services').select('*').order('id'),supabaseClient.from('projects').select('*').order('id'),supabaseClient.from('reviews').select('*').order('id'),supabaseClient.from('requests').select('*').order('id'),supabaseClient.from('favorites').select('*').eq('user_id',db.me||'00000000-0000-0000-0000-000000000000'),supabaseClient.from('profiles').select('id,name,role')]);
+  if(sErr||pErr||rErr||qErr||fErr||uErr){console.warn('Supabase load',sErr||pErr||rErr||qErr||fErr||uErr);return;}
+  // Не стираем исходные услуги и проекты, если Supabase пока пустой.
+  // После наполнения Supabase удалённые данные будут загружаться автоматически.
+  if((services||[]).length){
+    db.services=services.map(s=>{const old=db.services.find(x=>x.title===s.title||String(x.id)===String(s.id));return {id:Number(s.id),cat:Number(s.category_id)||0,title:s.title,price:Number(s.price)||0,u:'м²',days:old?.days||21,type:s.type,short:s.description||old?.short||'',descr:s.description||old?.descr||'',img:s.image||old?.img||''};});
+  }
+  if((projects||[]).length){
+    db.projects=projects.map(p=>{const old=db.projects.find(x=>x.title===p.title||String(x.id)===String(p.id));return {id:Number(p.id),title:p.title,type:p.type,descr:p.description||old?.descr||'',img:p.image||old?.img||''};});
+  }
+  db.reviews=(reviews||[]).map(r=>({id:Number(r.id),uid:r.user_id,sid:Number(r.service_id),rate:r.rate,text:r.text,date:(r.created_at||'').slice(0,10)}));
+  db.reqs=(requests||[]).map(r=>({id:Number(r.id),uid:r.user_id,sid:Number(r.service_id),kind:r.kind,phone:r.phone||'',comment:r.comment||'',status:r.status,date:(r.created_at||'').slice(0,10)}));
+  db.favs=(favorites||[]).map(f=>({uid:f.user_id,sid:Number(f.service_id)}));
+  db.users=[...(db.users||[]),...(profiles||[]).map(p=>({id:p.id,name:p.name,email:'',role:p.role||'user'}))].filter((u,i,a)=>a.findIndex(x=>x.id===u.id)===i);
+}
+async function migrateSeed(){const {count}=await supabaseClient.from('services').select('*',{count:'exact',head:true});if(count!==0)return;const s=seed();const rows=s.services.map(x=>({title:x.title,description:x.descr||x.short||'',price:x.price,type:x.type,category_id:x.cat,image:x.img||null}));const p=s.projects.map(x=>({title:x.title,description:x.descr||'',type:x.type,image:x.img||null}));await supabaseClient.from('services').insert(rows);await supabaseClient.from('projects').insert(p);}
+(async()=>{db=seed();await syncUser();await migrateSeed();await loadRemote();addEventListener('hashchange',()=>route());route();})();
 </script>
 </body>
 </html>
